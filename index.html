@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Listen &amp; Repeat</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;600;800&display=swap">
+<style>
+:root{--bg:#E8EEF6;--ink:#14213D;--muted:#5B6B86;--front:#fff;--back:#1F3A5F;--backink:#F2F6FC;--accent:#2F5BEA;--good:#16915F;--mid:#C98A0B;--miss:#D6403F;--line:#C8D3E3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1624;--ink:#E8EEF8;--muted:#8D9BB5;--front:#18233A;--back:#2F5BEA;--backink:#fff;--accent:#7C9CFF;--good:#3CCB8C;--mid:#E8B34A;--miss:#FF6B6A;--line:#2A3855}}
+:root[data-theme="dark"]{--bg:#0F1624;--ink:#E8EEF8;--muted:#8D9BB5;--front:#18233A;--back:#2F5BEA;--backink:#fff;--accent:#7C9CFF;--good:#3CCB8C;--mid:#E8B34A;--miss:#FF6B6A;--line:#2A3855}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,sans-serif;min-height:100vh}
+main{max-width:520px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:1.4rem;font-weight:800;margin:4px 0 12px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{flex:1;font:inherit;font-weight:600;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--front);color:var(--ink);cursor:pointer}
+.tab[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn{font:inherit;font-weight:600;font-size:1rem;padding:13px 16px;border-radius:12px;border:2px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .btn{flex:1}
+.panel{background:var(--front);border:1px solid var(--line);border-radius:18px;padding:22px 18px;margin-bottom:14px}
+.count{color:var(--muted);font-size:.85rem;margin-bottom:10px}
+.play{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 0}
+.big{width:104px;height:104px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:2.4rem;cursor:pointer}
+.hint{color:var(--muted);font-size:.9rem;text-align:center}
+.es{font-size:1.9rem;font-weight:800;line-height:1.2;margin:0 0 6px}
+.en{font-size:1.1rem;margin:0 0 16px}
+.pairs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.pair{border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:.9rem}
+.pair b{display:block}
+.pair span{color:var(--muted);font-size:.8rem}
+.note{border-left:4px solid var(--accent);padding:4px 0 4px 12px;margin:0;color:var(--muted)}
+.result{margin-top:14px;padding:14px;border-radius:12px;background:var(--bg)}
+.score{font-size:2rem;font-weight:800}
+.words span{display:inline-block;margin:2px 4px 2px 0;padding:2px 7px;border-radius:6px;font-weight:600}
+.ok{background:color-mix(in srgb,var(--good) 22%,transparent)}
+.bad{background:color-mix(in srgb,var(--miss) 22%,transparent)}
+.heard{color:var(--muted);font-size:.9rem;margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--front);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:1.3rem}.stat span{font-size:.8rem;color:var(--muted)}
+.bars{display:flex;align-items:flex-end;gap:5px;height:110px;margin:10px 0 4px}
+.bar{flex:1;border-radius:4px 4px 0 0;background:var(--accent);min-height:3px}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--line)}
+h2{font-size:1.05rem;margin:18px 0 6px}
+audio{width:100%;margin-top:10px}
+.clear{margin-top:18px;border-color:var(--miss);color:var(--miss);width:100%}
+</style>
+</head>
+<body>
+<main>
+<h1>Listen &amp; Repeat · Spanish</h1>
+<div class="tabs" role="tablist">
+<button class="tab" role="tab" id="tStudy" aria-selected="true">Study</button>
+<button class="tab" role="tab" id="tProg" aria-selected="false">Progress</button>
+</div>
+
+<section id="study">
+<div class="count" id="count"></div>
+<div class="panel" id="front">
+<div class="play">
+<button class="big" id="play" aria-label="Play audio">▶</button>
+<div class="hint" id="audiomsg">Listen, then flip to check what you understood.</div>
+<button class="btn" id="slow">Play slowly</button>
+</div>
+</div>
+<div class="panel" id="back" hidden>
+<p class="es" id="es"></p>
+<p class="en" id="en"></p>
+<div class="pairs" id="pairs"></div>
+<p class="note" id="note"></p>
+</div>
+<div id="speak" hidden>
+<div class="row"><button class="btn primary" id="rec">🎤 Check my speaking</button><button class="btn" id="rec2">⏺ Record &amp; compare</button></div>
+<div class="result" id="result" hidden></div>
+</div>
+<div class="row" style="margin-top:14px">
+<button class="btn" id="flip">Flip card</button>
+<button class="btn" id="next">Next card</button>
+</div>
+</section>
+
+<section id="prog" hidden>
+<div class="stats">
+<div class="stat"><b id="pN">0</b><span>Attempts</span></div>
+<div class="stat"><b id="pA">–</b><span>Average</span></div>
+<div class="stat"><b id="pT">–</b><span>Last 10 vs before</span></div>
+</div>
+<div class="panel">
+<div>Your last 20 attempts</div>
+<div class="bars" id="bars"></div>
+<div class="hint">Taller bars mean more of the sentence matched.</div>
+</div>
+<h2>Needs the most practice</h2>
+<ul id="weak"></ul>
+<button class="btn clear" id="clear">Clear my progress</button>
+</section>
+</main>
+<script>
+var CARDS=[
+{t:"Buenos días, ¿cómo estás?",tr:"Good morning, how are you?",w:[["buenos","good"],["días","days"],["cómo","how"],["estás","you are"]],g:"Estás comes from estar, used for how someone feels right now."},
+{t:"No entiendo lo que dices.",tr:"I don’t understand what you’re saying.",w:[["no","not"],["entiendo","I understand"],["lo que","what"],["dices","you say"]],g:"Lo que means “what” when it joins two parts of a sentence."},
+{t:"¿Dónde está la estación?",tr:"Where is the station?",w:[["dónde","where"],["está","is"],["la","the"],["estación","station"]],g:"Use estar (está) to say where something is."},
+{t:"Me gustaría un café, por favor.",tr:"I would like a coffee, please.",w:[["me","to me"],["gustaría","would please"],["un","a"],["café","coffee"],["por favor","please"]],g:"Me gustaría is a polite way to ask. Literally, “it would please me.”"},
+{t:"Tengo hambre.",tr:"I’m hungry.",w:[["tengo","I have"],["hambre","hunger"]],g:"Spanish says you “have” hunger instead of “being” hungry."},
+{t:"Hablas muy rápido.",tr:"You speak very fast.",w:[["hablas","you speak"],["muy","very"],["rápido","fast"]],g:"Useful to know: it’s fine to ask someone to speak más despacio (more slowly)."},
+{t:"Vamos a comer juntos.",tr:"Let’s eat together.",w:[["vamos","we go"],["a","to"],["comer","eat"],["juntos","together"]],g:"Ir a + a verb means “going to.” Vamos a + verb also means “let’s.”"},
+{t:"Nos vemos mañana.",tr:"See you tomorrow.",w:[["nos","each other"],["vemos","we see"],["mañana","tomorrow"]],g:"Nos vemos is a common goodbye. Literally, “we see each other.”"}
+];
+var KEY="listen-repeat-log-v1",$=function(i){return document.getElementById(i)};
+var log=[],idx=0,flipped=false,listening=false;
+function load(){try{var d=JSON.parse(localStorage.getItem(KEY)||"[]");if(Array.isArray(d))log=d}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(log.slice(-500)))}catch(e){}}
+
+/* audio */
+function voice(){var v=speechSynthesis.getVoices();return v.find(function(x){return /^es/i.test(x.lang)})||null}
+function say(rate){
+if(!("speechSynthesis" in window)){alert("This browser can’t play spoken audio.");return}
+speechSynthesis.cancel();
+var u=new SpeechSynthesisUtterance(CARDS[idx].t);u.lang="es-ES";u.rate=rate;
+var v=voice();if(v)u.voice=v;
+var m=$("audiomsg"),ok=false;
+m.textContent=v?"Playing…":"Playing with your device’s default voice (no Spanish voice found).";
+u.onstart=function(){ok=true};
+u.onend=function(){m.textContent="Listen, then flip to check what you understood."};
+u.onerror=function(e){ok=true;m.textContent="Audio couldn’t play ("+(e.error||"unknown error")+"). Try Chrome or Safari, and check your volume."};
+speechSynthesis.speak(u);
+setTimeout(function(){if(!ok)m.textContent="No sound started. This viewer may block audio. Open the page in Chrome or Safari, and check your volume and silent switch."},2000);
+}
+if("speechSynthesis" in window)speechSynthesis.onvoiceschanged=function(){};
+
+/* cards */
+function norm(s){return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(Boolean)}
+function show(){
+var c=CARDS[idx];flipped=false;
+$("count").textContent="Card "+(idx+1)+" of "+CARDS.length;
+$("front").hidden=false;$("back").hidden=true;$("speak").hidden=true;$("result").hidden=true;
+$("flip").textContent="Flip card";
+$("es").textContent=c.t;$("en").textContent=c.tr;$("note").textContent=c.g;
+var p=$("pairs");p.innerHTML="";
+c.w.forEach(function(x){var d=document.createElement("div");d.className="pair";var b=document.createElement("b");b.textContent=x[0];var s=document.createElement("span");s.textContent=x[1];d.appendChild(b);d.appendChild(s);p.appendChild(d)});
+}
+function flip(){
+flipped=!flipped;
+$("front").hidden=flipped;$("back").hidden=!flipped;$("speak").hidden=!flipped;
+$("flip").textContent=flipped?"Back to audio":"Flip card";
+}
+
+/* speaking check */
+function score(target,heard){
+var a=norm(target),b=norm(heard),n=a.length,m=b.length,L=[],i,j;
+for(i=0;i<=n;i++){L.push(new Array(m+1).fill(0))}
+for(i=1;i<=n;i++)for(j=1;j<=m;j++)L[i][j]=a[i-1]===b[j-1]?L[i-1][j-1]+1:Math.max(L[i-1][j],L[i][j-1]);
+var hit=new Array(n).fill(false);i=n;j=m;
+while(i>0&&j>0){if(a[i-1]===b[j-1]){hit[i-1]=true;i--;j--}else if(L[i-1][j]>=L[i][j-1])i--;else j--}
+return{pct:Math.round(100*L[n][m]/n),hit:hit,words:target.replace(/[¿?¡!,.]/g,"").split(/\s+/)}
+}
+function record(sc,heard){
+log.push({id:idx,s:sc,ts:Date.now()});save();
+}
+function result(html){var r=$("result");r.hidden=false;r.innerHTML="";r.appendChild(html)}
+function showScore(heard){
+var sc=score(CARDS[idx].t,heard),box=document.createElement("div");
+var big=document.createElement("div");big.className="score";big.textContent=sc.pct+"%";
+var msg=document.createElement("div");msg.textContent=sc.pct>=85?"Great match.":sc.pct>=50?"Close. Listen once more and try again.":"Keep going. Play it slowly and try again.";
+var w=document.createElement("div");w.className="words";
+sc.words.forEach(function(t,k){var s=document.createElement("span");s.className=sc.hit[k]?"ok":"bad";s.textContent=t;w.appendChild(s)});
+var h=document.createElement("div");h.className="heard";h.textContent="We heard: “"+heard+"”";
+[big,msg,w,h].forEach(function(e){box.appendChild(e)});
+result(box);record(sc.pct);
+}
+function selfRate(){
+var box=document.createElement("div"),p=document.createElement("div");
+p.textContent="Speech checking isn’t available in this browser. How did it go?";box.appendChild(p);
+var r=document.createElement("div");r.className="row";r.style.marginTop="10px";
+[["Nailed it",100],["Close",60],["Struggled",30]].forEach(function(x){var b=document.createElement("button");b.className="btn";b.textContent=x[0];b.onclick=function(){record(x[1]);$("result").hidden=true};r.appendChild(b)});
+box.appendChild(r);result(box);
+}
+function say2(msg){var d=document.createElement("div");d.textContent=msg;result(d)}
+function startRec(){
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR){fallbackSpeak(selfRate);return}
+if(listening)return;
+speechSynthesis.cancel();
+var r=new SR();r.lang="es-ES";r.interimResults=false;r.maxAlternatives=1;
+var got=false;
+r.onstart=function(){listening=true;$("rec").disabled=true;$("rec").textContent="Listening… speak now";say2("Listening…")};
+r.onresult=function(e){got=true;showScore(e.results[0][0].transcript)};
+r.onerror=function(e){got=true;if(e.error==="not-allowed"||e.error==="service-not-allowed"){fallbackSpeak(blocked)}else say2("Couldn’t hear that ("+e.error+"). Try again.")};
+r.onend=function(){listening=false;$("rec").disabled=false;$("rec").textContent="🎤 Say it again";if(!got)say2("Didn’t catch anything. Tap the microphone and try again.")};
+try{r.start()}catch(e){selfRate()}
+}
+
+function ratingRow(done){
+var r=document.createElement("div");r.className="row";r.style.marginTop="10px";
+[["Nailed it",100],["Close",60],["Struggled",30]].forEach(function(x){var b=document.createElement("button");b.className="btn";b.textContent=x[0];b.onclick=function(){record(x[1]);r.textContent="Saved. Nice work.";if(done)done()};r.appendChild(b)});
+return r}
+function blocked(){
+var box=document.createElement("div"),p=document.createElement("div");
+p.textContent="The microphone is blocked in this viewer, and phone settings can’t change that. You can still practice out loud and rate yourself:";
+box.appendChild(p);box.appendChild(ratingRow());result(box)}
+function fallbackSpeak(then){
+viaDictation().then(function(ok){if(!ok)then()})}
+async function viaDictation(){
+var d=null;try{d=window.claude&&await claude.use("dictation")}catch(e){}
+if(!d)return false;
+var text="",on=false;
+d.onFinal(function(x){text+=" "+x.text});
+d.onState(function(x){if(x.state==="listening")on=true;if(x.state==="idle"&&on){on=false;$("rec").disabled=false;text.trim()?showScore(text.trim()):say2("Didn’t catch anything. Try again.")}});
+try{await d.start();say2("Listening… tap Check my speaking again when you’re done.");return true}catch(e){return false}}
+var mr=null,chunks=[];
+function startCompare(){
+if(mr&&mr.state==="recording"){mr.stop();return}
+if(!navigator.mediaDevices||!window.MediaRecorder){blocked();return}
+speechSynthesis.cancel();
+navigator.mediaDevices.getUserMedia({audio:true}).then(function(st){
+chunks=[];mr=new MediaRecorder(st);
+mr.ondataavailable=function(e){if(e.data.size)chunks.push(e.data)};
+mr.onstop=function(){st.getTracks().forEach(function(t){t.stop()});$("rec2").textContent="⏺ Record again";
+compareUI(URL.createObjectURL(new Blob(chunks,{type:mr.mimeType||"audio/mp4"})))};
+mr.start();$("rec2").textContent="⏹ Stop recording";say2("Recording… tap Stop when you’re done.");
+}).catch(blocked)}
+function compareUI(url){
+var box=document.createElement("div"),p=document.createElement("div");
+p.textContent="Hear yourself, then the original. How close was it?";
+var a=document.createElement("audio");a.controls=true;a.src=url;
+var o=document.createElement("button");o.className="btn";o.style.marginTop="10px";o.textContent="Hear the original";o.onclick=function(){say(.9)};
+[p,a,o,ratingRow()].forEach(function(e){box.appendChild(e)});result(box)}
+
+/* progress */
+function avg(a){return a.length?Math.round(a.reduce(function(x,y){return x+y},0)/a.length):null}
+function renderProg(){
+var s=log.map(function(x){return x.s});
+$("pN").textContent=s.length;
+$("pA").textContent=s.length?avg(s)+"%":"–";
+var last=s.slice(-10),prev=s.slice(0,-10);
+$("pT").textContent=last.length&&prev.length?((avg(last)-avg(prev)>=0?"+":"")+(avg(last)-avg(prev))+"%"):"–";
+var bars=$("bars");bars.innerHTML="";
+s.slice(-20).forEach(function(v){var b=document.createElement("div");b.className="bar";b.style.height=Math.max(3,v)+"%";b.title=v+"%";bars.appendChild(b)});
+var by={};log.forEach(function(x){(by[x.id]=by[x.id]||[]).push(x.s)});
+var rows=Object.keys(by).map(function(k){return{k:+k,a:avg(by[k]),n:by[k].length}}).sort(function(x,y){return x.a-y.a}).slice(0,5);
+var ul=$("weak");ul.innerHTML="";
+if(!rows.length){var li=document.createElement("li");li.textContent="Practice a few cards and your weak spots will show up here.";ul.appendChild(li)}
+rows.forEach(function(r){var li=document.createElement("li");var a=document.createElement("span");a.textContent=CARDS[r.k].t;var b=document.createElement("span");b.textContent=r.a+"% · "+r.n+"×";li.appendChild(a);li.appendChild(b);ul.appendChild(li)});
+}
+function tab(p){
+$("study").hidden=p;$("prog").hidden=!p;
+$("tStudy").setAttribute("aria-selected",!p);$("tProg").setAttribute("aria-selected",p);
+if(p)renderProg();
+}
+
+$("play").onclick=function(){say(.9)};
+$("slow").onclick=function(){say(.55)};
+$("flip").onclick=flip;
+$("next").onclick=function(){speechSynthesis.cancel();idx=(idx+1)%CARDS.length;show()};
+$("rec").onclick=startRec;
+$("rec2").onclick=startCompare;
+$("tStudy").onclick=function(){tab(false)};
+$("tProg").onclick=function(){tab(true)};
+$("clear").onclick=function(){if(confirm("Clear all your attempts?")){log=[];save();renderProg()}};
+load();show();
+</script>
+</body>
+</html>

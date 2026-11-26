@@ -117,11 +117,15 @@ var f=$("file").files[0];
 if(!f){status("Choose a file first.");return}
 $("go").disabled=true;
 try{
+var Ctx=window.AudioContext||window.webkitAudioContext,ctx=new Ctx();
+try{ctx.resume()}catch(e){}
 status("Reading the file…");
 var ab=await f.arrayBuffer();
-var Ctx=window.AudioContext||window.webkitAudioContext,ctx=new Ctx();
 status("Decoding the audio… this can take a minute.");
-var buf=await new Promise(function(res,rej){ctx.decodeAudioData(ab,res,rej)});
+var buf=await new Promise(function(res,rej){
+var tm=setTimeout(function(){rej(new Error("decoding timed out"))},90000);
+var p=ctx.decodeAudioData(ab,function(b){clearTimeout(tm);res(b)},function(er){clearTimeout(tm);rej(er||new Error("this browser can’t decode that file"))});
+if(p&&p.catch)p.catch(function(){})});
 try{ctx.close()}catch(e){}
 var sr=Math.min(16000,buf.sampleRate),x=down(mono(buf),buf.sampleRate,sr);
 status("Finding natural pauses…");
@@ -132,7 +136,7 @@ var d={id:Date.now(),name:$("name").value.trim()||f.name.replace(/\.[^.]+$/,""),
 status("Saving "+cards.length+" cards…");
 await putDeck(d);status("Done: "+cards.length+" cards.");
 await list();
-}catch(e){status("Couldn’t read that file. Try a shorter clip or an .mp4, .m4a or .mp3 file.")}
+}catch(e){status("Couldn’t build the deck. Details: "+((e&&e.name)||"error")+" – "+((e&&e.message)||"no message")+". Audio-only files (.m4a, .mp3, .wav) work best.")}
 $("go").disabled=false}
 
 /* deck list */

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deck Builder</title>
+<style>
+:root{--bg:#E8EEF6;--ink:#14213D;--muted:#5B6B86;--card:#fff;--accent:#2F5BEA;--miss:#D6403F;--line:#C8D3E3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0F1624;--ink:#E8EEF8;--muted:#8D9BB5;--card:#18233A;--accent:#7C9CFF;--miss:#FF6B6A;--line:#2A3855}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+main{max-width:520px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:1.4rem;margin:4px 0 4px}h2{font-size:1.05rem;margin:18px 0 8px}
+p,.muted{color:var(--muted);margin:4px 0 12px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.btn{font:inherit;font-weight:600;padding:12px 14px;border-radius:12px;border:2px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
+.btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.sel{background:var(--ink);color:var(--bg)}
+.btn:disabled{opacity:.4}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>.btn{flex:1}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+input[type=text],textarea{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+textarea{min-height:64px;resize:vertical}
+input[type=range]{width:100%}
+.deck{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
+.big{display:block;margin:10px auto;width:112px;height:112px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:2.6rem;cursor:pointer}
+.c{text-align:center}
+.thai{font-size:1.6rem;font-weight:700}
+#status{color:var(--accent);font-weight:600;min-height:1.4em}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+<div id="home">
+<h1>Deck Builder</h1>
+<p>Turn a video or audio file into listening cards. <a href="index.html">Speaking practice</a></p>
+<div class="panel">
+<h2 style="margin-top:0">Make a new deck</h2>
+<label for="file">Video or audio file</label>
+<input type="file" id="file" accept="audio/*,video/*">
+<label for="name">Deck name</label>
+<input type="text" id="name" placeholder="e.g. Real Talk, Episode 1">
+<label for="len">Clip length: about <b id="lenv">6</b> seconds</label>
+<input type="range" id="len" min="2" max="20" value="6">
+<p class="muted" style="margin-top:8px">Cuts are made at natural pauses, so clips vary a little. Start with files under about 10 minutes.</p>
+<button class="btn p" id="go" style="width:100%">Build deck</button>
+<div id="status" role="status"></div>
+</div>
+<div class="panel"><h2 style="margin-top:0">My decks</h2><div id="decks"></div></div>
+</div>
+
+<div id="study" hidden>
+<div class="row"><button class="btn" id="back">← Decks</button><span class="muted" id="count" style="flex:2;text-align:right"></span></div>
+<div class="panel" id="front">
+<button class="big" id="play" aria-label="Play">▶</button>
+<div class="row" style="justify-content:center">
+<button class="btn" id="loop">Loop: off</button>
+<button class="btn" data-s=".6">0.6×</button><button class="btn" data-s=".8">0.8×</button><button class="btn sel" data-s="1">1×</button>
+</div>
+<p class="c" style="margin-bottom:0">Listen until you catch every word. Then flip.</p>
+</div>
+<div class="panel" id="rear" hidden>
+<label for="t">Text</label><textarea id="t" class="thai" placeholder="Type or paste the text here"></textarea>
+<label for="r">Pronunciation (optional)</label><input type="text" id="r">
+<label for="en">Translation (optional)</label><input type="text" id="en">
+<label for="g">Word-for-word / grammar notes (optional)</label><textarea id="g"></textarea>
+</div>
+<div class="row"><button class="btn" id="prev">← Prev</button><button class="btn p" id="flip">Flip</button><button class="btn" id="next">Next →</button></div>
+<details class="panel" style="margin-top:14px"><summary><b>Paste text for all cards</b></summary>
+<p>One line per clip, in order. Separate parts with | like: text | pronunciation | translation | notes</p>
+<textarea id="bulk" style="min-height:140px"></textarea>
+<button class="btn p" id="fill" style="width:100%;margin-top:8px">Fill the cards</button>
+<div id="bst" class="muted"></div>
+</details>
+</div>
+</main>
+<script>
+var $=function(i){return document.getElementById(i)};
+var DB,deck=null,idx=0,flipped=false,audio=new Audio(),url=null,loopOn=false,speed=1;
+
+function openDB(){return new Promise(function(res,rej){var q=indexedDB.open("deck-builder",1);q.onupgradeneeded=function(){q.result.createObjectStore("decks",{keyPath:"id"})};q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}})}
+function dbDo(mode,fn){return new Promise(function(res,rej){var t=DB.transaction("decks",mode),r=fn(t.objectStore("decks"));t.oncomplete=function(){res(r.result)};t.onerror=function(){rej(t.error)}})}
+function putDeck(d){return dbDo("readwrite",function(s){return s.put(d)})}
+function allDecks(){return dbDo("readonly",function(s){return s.getAll()})}
+function delDeck(id){return dbDo("readwrite",function(s){return s.delete(id)})}
+
+/* audio processing */
+function mono(buf){var ch=buf.numberOfChannels,m=new Float32Array(buf.length);for(var c=0;c<ch;c++){var d=buf.getChannelData(c);for(var i=0;i<buf.length;i++)m[i]+=d[i]/ch}return m}
+function down(x,sr,to){var r=sr/to,n=Math.floor(x.length/r),o=new Float32Array(n);for(var i=0;i<n;i++){var a=Math.floor(i*r),b=Math.max(a+1,Math.floor((i+1)*r)),s=0;for(var j=a;j<b;j++)s+=x[j];o[i]=s/(b-a)}return o}
+function cutPoints(x,sr,target){
+var hop=Math.floor(sr*0.02),n=Math.floor(x.length/hop),e=new Float32Array(n),i,j;
+for(i=0;i<n;i++){var s=0;for(j=i*hop;j<(i+1)*hop;j++)s+=x[j]*x[j];e[i]=Math.sqrt(s/hop)}
+var so=Array.from(e).sort(function(a,b){return a-b}),thr=Math.max((so[Math.floor(n*.2)]||0)*2.5,(so[Math.floor(n*.9)]||0)*.06,.002);
+var cands=[],run=0;
+for(i=0;i<=n;i++){if(i<n&&e[i]<thr)run++;else{if(run>=13)cands.push(i-Math.floor(run/2));run=0}}
+var cuts=[0],fpt=target/.02,last=0;
+while(n-last>fpt*1.5){
+var lo=last+fpt*.5,hi=last+fpt*1.5,best=-1,bd=1e9;
+cands.forEach(function(c){if(c>=lo&&c<=hi){var d=Math.abs(c-(last+fpt));if(d<bd){bd=d;best=c}}});
+if(best<0){var a=Math.floor(last+fpt*.8),b=Math.min(n-1,Math.floor(last+fpt*1.2)),m=1e9;for(i=a;i<=b;i++)if(e[i]<m){m=e[i];best=i}}
+if(best<=last)best=Math.floor(last+fpt);
+cuts.push(best);last=best}
+cuts.push(n);
+return cuts.map(function(c){return c*hop})}
+function wav(f,sr){
+var b=new ArrayBuffer(44+f.length*2),v=new DataView(b);
+function w(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))}
+w(0,"RIFF");v.setUint32(4,36+f.length*2,true);w(8,"WAVEfmt ");v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,"data");v.setUint32(40,f.length*2,true);
+for(var i=0;i<f.length;i++){var s=Math.max(-1,Math.min(1,f[i]));v.setInt16(44+i*2,s<0?s*32768:s*32767,true)}
+return new Blob([b],{type:"audio/wav"})}
+function status(t){$("status").textContent=t}
+async function build(){
+var f=$("file").files[0];
+if(!f){status("Choose a file first.");return}
+$("go").disabled=true;
+try{
+status("Reading the file…");
+var ab=await f.arrayBuffer();
+var Ctx=window.AudioContext||window.webkitAudioContext,ctx=new Ctx();
+status("Decoding the audio… this can take a minute.");
+var buf=await new Promise(function(res,rej){ctx.decodeAudioData(ab,res,rej)});
+try{ctx.close()}catch(e){}
+var sr=Math.min(16000,buf.sampleRate),x=down(mono(buf),buf.sampleRate,sr);
+status("Finding natural pauses…");
+var cuts=cutPoints(x,sr,+$("len").value),cards=[];
+for(var i=0;i<cuts.length-1;i++){var seg=x.subarray(cuts[i],cuts[i+1]);if(seg.length<sr*.4)continue;cards.push({blob:wav(seg,sr),dur:seg.length/sr,t:"",r:"",en:"",g:""})}
+if(!cards.length)throw new Error("no audio found");
+var d={id:Date.now(),name:$("name").value.trim()||f.name.replace(/\.[^.]+$/,""),cards:cards};
+status("Saving "+cards.length+" cards…");
+await putDeck(d);status("Done: "+cards.length+" cards.");
+await list();
+}catch(e){status("Couldn’t read that file. Try a shorter clip or an .mp4, .m4a or .mp3 file.")}
+$("go").disabled=false}
+
+/* deck list */
+async function list(){
+var ds=await allDecks(),box=$("decks");box.innerHTML="";
+if(!ds.length){box.innerHTML='<p class="muted" style="margin:0">No decks yet.</p>';return}
+ds.sort(function(a,b){return b.id-a.id}).forEach(function(d){
+var r=document.createElement("div");r.className="deck";
+var s=document.createElement("span");s.textContent=d.name+" · "+d.cards.length+" cards";
+var o=document.createElement("button");o.className="btn p";o.textContent="Open";o.onclick=function(){open_(d)};
+var x=document.createElement("button");x.className="btn";x.textContent="Delete";x.setAttribute("aria-label","Delete "+d.name);x.style.color="var(--miss)";
+x.onclick=async function(){if(confirm("Delete “"+d.name+"”?")){await delDeck(d.id);list()}};
+var b=document.createElement("div");b.className="row";b.style.flex="none";b.appendChild(o);b.appendChild(x);
+r.appendChild(s);r.appendChild(b);box.appendChild(r)})}
+
+/* study */
+function open_(d){deck=d;idx=+(localStorage.getItem("pos"+d.id)||0);if(idx>=d.cards.length)idx=0;$("home").hidden=true;$("study").hidden=false;show()}
+function show(){
+audio.pause();$("play").textContent="▶";
+var c=deck.cards[idx];
+if(url)URL.revokeObjectURL(url);
+url=URL.createObjectURL(c.blob);audio.src=url;audio.loop=loopOn;audio.playbackRate=speed;
+$("count").textContent=deck.name+" · card "+(idx+1)+" of "+deck.cards.length+" · "+c.dur.toFixed(1)+"s";
+flipped=false;$("front").hidden=false;$("rear").hidden=true;$("flip").textContent="Flip";
+$("t").value=c.t;$("r").value=c.r;$("en").value=c.en;$("g").value=c.g;
+try{localStorage.setItem("pos"+deck.id,idx)}catch(e){}}
+function go(n){idx=(idx+n+deck.cards.length)%deck.cards.length;show()}
+function togglePlay(){if(audio.paused){audio.play().catch(function(){});}else audio.pause()}
+audio.onplay=function(){$("play").textContent="⏸"};
+audio.onpause=function(){$("play").textContent="▶"};
+audio.onended=function(){$("play").textContent="▶"};
+$("play").onclick=togglePlay;
+$("loop").onclick=function(){loopOn=!loopOn;audio.loop=loopOn;this.textContent="Loop: "+(loopOn?"on":"off");this.classList.toggle("sel",loopOn)};
+document.querySelectorAll("[data-s]").forEach(function(b){b.onclick=function(){speed=+b.dataset.s;audio.playbackRate=speed;try{audio.preservesPitch=true;audio.webkitPreservesPitch=true}catch(e){}document.querySelectorAll("[data-s]").forEach(function(x){x.classList.toggle("sel",x===b)})}});
+$("flip").onclick=function(){flipped=!flipped;$("front").hidden=flipped;$("rear").hidden=!flipped;this.textContent=flipped?"Back to audio":"Flip"};
+$("prev").onclick=function(){go(-1)};$("next").onclick=function(){go(1)};
+$("back").onclick=function(){audio.pause();$("study").hidden=true;$("home").hidden=false;list()};
+var tmr;
+["t","r","en","g"].forEach(function(k){$(k).oninput=function(){deck.cards[idx][k]=this.value;clearTimeout(tmr);tmr=setTimeout(function(){putDeck(deck)},600)}});
+$("fill").onclick=async function(){
+var lines=$("bulk").value.split("\n").map(function(l){return l.trim()}).filter(Boolean),n=Math.min(lines.length,deck.cards.length);
+for(var i=0;i<n;i++){var p=lines[i].split("|").map(function(x){return x.trim()});var c=deck.cards[i];c.t=p[0]||"";c.r=p[1]||"";c.en=p[2]||"";c.g=p[3]||""}
+await putDeck(deck);show();
+$("bst").textContent="Filled "+n+" of "+deck.cards.length+" cards"+(lines.length!==deck.cards.length?" (you pasted "+lines.length+" lines, so check the order).":".")};
+$("len").oninput=function(){$("lenv").textContent=this.value};
+$("go").onclick=build;
+openDB().then(function(d){DB=d;list()}).catch(function(){$("decks").textContent="Saving isn’t available in this browser mode (try turning off Private Browsing)."});
+</script>
+</body>
+</html>
